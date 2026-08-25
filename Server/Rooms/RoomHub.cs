@@ -10,70 +10,22 @@ public class RoomHub : Hub
 {
     private const string DefaultRoomId = "default";
 
-    private readonly IRoomStateStore _store;
+    private readonly RoomService _room;
 
-    public RoomHub(IRoomStateStore store)
+    public RoomHub(RoomService room)
     {
-        _store = store;
+        _room = room;
     }
 
     public override async Task OnConnectedAsync()
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, DefaultRoomId);
-        await Clients.Caller.SendAsync("RoomState", _store.Get(DefaultRoomId));
+        await Clients.Caller.SendAsync("RoomState", _room.GetState());
         await base.OnConnectedAsync();
     }
 
-    public async Task LoadVideo(string videoId)
-    {
-        var state = new RoomState
-        {
-            VideoId = videoId,
-            IsPlaying = true,
-            PositionAtBroadcast = 0,
-            ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        };
-        await Broadcast(state);
-    }
-
-    public async Task Play(double fromPosition)
-    {
-        var current = _store.Get(DefaultRoomId);
-        var state = current with
-        {
-            IsPlaying = true,
-            PositionAtBroadcast = fromPosition,
-            ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        };
-        await Broadcast(state);
-    }
-
-    public async Task Pause(double atPosition)
-    {
-        var current = _store.Get(DefaultRoomId);
-        var state = current with
-        {
-            IsPlaying = false,
-            PositionAtBroadcast = atPosition,
-            ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        };
-        await Broadcast(state);
-    }
-
-    public async Task Seek(double toPosition)
-    {
-        var current = _store.Get(DefaultRoomId);
-        var state = current with
-        {
-            PositionAtBroadcast = toPosition,
-            ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        };
-        await Broadcast(state);
-    }
-
-    private async Task Broadcast(RoomState state)
-    {
-        _store.Set(DefaultRoomId, state);
-        await Clients.Group(DefaultRoomId).SendAsync("RoomState", state);
-    }
+    public Task LoadVideo(string videoId) => _room.LoadVideo(videoId);
+    public Task Play(double fromPosition) => _room.Play(fromPosition);
+    public Task Pause(double atPosition) => _room.Pause(atPosition);
+    public Task Seek(double toPosition) => _room.Seek(toPosition);
 }

@@ -1,3 +1,7 @@
+.yt-locked iframe {
+  pointer-events: none;
+}
+
 .yt-placeholder {
   display: flex;
   align-items: center;

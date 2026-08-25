@@ -51,7 +51,12 @@ export default function RoomPlayer({ role }: Props) {
     player.seekTo(target, true);
     if (room.isPlaying) player.playVideo();
     else player.pauseVideo();
-  }, [isDj, joined, room.videoId, room.isPlaying, room.positionAtBroadcast, room.serverTime]);
+
+    // Loading a new video can silently re-mute the player even after the
+    // listener already unmuted — re-assert it so a new track doesn't go
+    // quiet again.
+    if (!muted) player.unMute();
+  }, [isDj, joined, muted, room.videoId, room.isPlaying, room.positionAtBroadcast, room.serverTime]);
 
   // Follower-only: continuous drift correction while playing — small gap
   // -> gentle playback-rate nudge, large gap -> hard seek. See lib/sync.ts.
@@ -108,7 +113,9 @@ export default function RoomPlayer({ role }: Props) {
   }
 
   function handleUnmute() {
-    playerRef.current?.getPlayer()?.unMute();
+    const player = playerRef.current?.getPlayer();
+    if (!player) return; // not ready yet — button stays put, user can retry
+    player.unMute();
     setMuted(false);
   }
 
@@ -145,6 +152,7 @@ export default function RoomPlayer({ role }: Props) {
         ref={playerRef}
         videoId={room.videoId}
         controls={isDj}
+        locked={!isDj}
         onReady={handleReady}
         onStateChange={handleStateChange}
         onEnded={() => isDj && pause(0)}
