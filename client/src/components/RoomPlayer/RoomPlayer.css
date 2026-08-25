@@ -1,0 +1,49 @@
+.room-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.room-player h2 {
+  font-size: 1rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aaa;
+}
+
+.load-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.load-row input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+
+.room-player button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.room-player button:hover {
+  border-color: #666;
+}
+
+.room-player .error {
+  color: #e05555;
+  font-size: 0.875rem;
+  margin: 0;
+}

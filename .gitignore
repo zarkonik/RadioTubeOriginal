@@ -1,0 +1,15 @@
+# .NET
+Server/bin/
+Server/obj/
+*.user
+
+# Node (client/.gitignore already covers most of this, kept here too
+# for anything run from the repo root)
+node_modules/
+dist/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store

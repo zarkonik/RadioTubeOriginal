@@ -1,0 +1,9 @@
+.yt-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 360px;
+  border: 1px dashed #444;
+  border-radius: 8px;
+  color: #888;
+}
