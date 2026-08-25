@@ -28,33 +28,83 @@ function extractVideoId(url) {
 
 const BACKEND_URL = "http://localhost:5181/api/room/load-video";
 
-// No setTimeout-based badge auto-clear: MV3 service workers can be
-// suspended between the fetch and a delayed timeout, leaving it never
-// firing. The badge just gets reset at the start of the next click
-// instead.
-async function sendCurrentVideo(tab) {
-  await browser.action.setBadgeText({ text: "", tabId: tab.id });
+// Persisted (not just in-memory) because the MV3 service worker can be
+// killed and restarted between events — losing armedTabId mid-session
+// would silently stop tracking without any visible sign to the DJ.
+async function getArmedState() {
+  const { armedTabId, lastVideoId } = await browser.storage.local.get(["armedTabId", "lastVideoId"]);
+  return { armedTabId: armedTabId ?? null, lastVideoId: lastVideoId ?? null };
+}
 
-  const videoId = extractVideoId(tab.url);
-  if (!videoId) {
-    await browser.action.setBadgeText({ text: "!", tabId: tab.id });
-    await browser.action.setBadgeBackgroundColor({ color: "#e05555", tabId: tab.id });
+async function setArmedState(armedTabId, lastVideoId = null) {
+  await browser.storage.local.set({ armedTabId, lastVideoId });
+}
+
+async function postVideoId(videoId) {
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ videoId }),
+  });
+  if (!res.ok) throw new Error(`Status ${res.status}`);
+}
+
+async function setArmedBadge(tabId) {
+  await browser.action.setBadgeText({ text: "DJ", tabId });
+  await browser.action.setBadgeBackgroundColor({ color: "#4a7dff", tabId });
+}
+
+async function clearBadge(tabId) {
+  await browser.action.setBadgeText({ text: "", tabId });
+}
+
+// Click toggles auto-tracking for that tab: first click arms it (and
+// sends whatever video is currently open), second click on the same tab
+// disarms it. Only one tab can be armed at a time.
+browser.action.onClicked.addListener(async (tab) => {
+  const { armedTabId } = await getArmedState();
+
+  if (armedTabId === tab.id) {
+    await setArmedState(null);
+    await clearBadge(tab.id);
     return;
   }
 
-  try {
-    const res = await fetch(BACKEND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ videoId }),
-    });
-    if (!res.ok) throw new Error(`Status ${res.status}`);
-    await browser.action.setBadgeText({ text: "✓", tabId: tab.id });
-    await browser.action.setBadgeBackgroundColor({ color: "#4caf50", tabId: tab.id });
-  } catch {
-    await browser.action.setBadgeText({ text: "✗", tabId: tab.id });
-    await browser.action.setBadgeBackgroundColor({ color: "#e05555", tabId: tab.id });
-  }
-}
+  if (armedTabId !== null) await clearBadge(armedTabId);
 
-browser.action.onClicked.addListener(sendCurrentVideo);
+  const videoId = extractVideoId(tab.url);
+  await setArmedState(tab.id, videoId);
+  await setArmedBadge(tab.id);
+
+  if (videoId) {
+    try {
+      await postVideoId(videoId);
+    } catch {
+      // Backend unreachable — stay armed, the next real video change
+      // (or a manual re-click) will retry.
+    }
+  }
+});
+
+// Content script reports every video change in the armed tab (manual
+// click on YouTube, or autoplay to the next track).
+browser.runtime.onMessage.addListener(async (msg, sender) => {
+  if (msg?.type !== "VIDEO_CHANGED" || !sender.tab) return;
+
+  const { armedTabId, lastVideoId } = await getArmedState();
+  if (sender.tab.id !== armedTabId) return; // not the DJ's tracked tab
+  if (msg.videoId === lastVideoId) return; // duplicate navigate-finish, ignore
+
+  await setArmedState(armedTabId, msg.videoId);
+  try {
+    await postVideoId(msg.videoId);
+  } catch {
+    // Leave it armed — a later track change will retry the POST.
+  }
+});
+
+// Don't leave a stale armed badge pointing at a tab that's gone.
+browser.tabs.onRemoved.addListener(async (tabId) => {
+  const { armedTabId } = await getArmedState();
+  if (tabId === armedTabId) await setArmedState(null);
+});
