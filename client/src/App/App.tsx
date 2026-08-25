@@ -19,7 +19,7 @@ function App() {
   return (
     <div className="page">
       <div className="room">
-        <h1>RadioTube</h1>
+        <h1>Radio2Gether</h1>
 
         {notice && (
           <div className="notice">

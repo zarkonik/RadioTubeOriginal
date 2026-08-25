@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRoomStore } from "../../store/roomStore";
 import "./Chat.css";
 
-const NICKNAME_KEY = "radiotube-nickname";
+const NICKNAME_KEY = "radio2gether-nickname";
 
 export default function Chat() {
   const chat = useRoomStore((s) => s.chat);

@@ -1,4 +1,4 @@
-// Runs on the RadioTube app itself (not YouTube) — on EVERY tab open to
+// Runs on the Radio2Gether app itself (not YouTube) — on EVERY tab open to
 // the app, both DJ and listener tabs alike, since content_scripts can't
 // tell them apart by URL. Reads the currently joined room's id and DJ
 // token straight out of the DOM (App.tsx sets

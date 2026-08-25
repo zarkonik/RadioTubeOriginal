@@ -37,7 +37,7 @@ function extractVideoId(url) {
 //
 // armedTabId/lastVideoId track the YouTube tab the DJ picked as their
 // source. djRoomId/djToken are separate and global (not per-tab):
-// whatever room+token app-content.js last reported from the RadioTube
+// whatever room+token app-content.js last reported from the Radio2Gether
 // app tab — there's realistically one DJ app tab open at a time, so the
 // two content scripts (running in two different tabs) meet here instead
 // of trying to match tab ids against each other.
@@ -92,7 +92,7 @@ async function sendVideo(tabId, roomId, djToken, videoId) {
     await postVideoId(roomId, djToken, videoId);
     await setArmedBadge(tabId, true);
   } catch (err) {
-    console.error("RadioTube: failed to send video to room", err);
+    console.error("Radio2Gether: failed to send video to room", err);
     await setArmedBadge(tabId, false);
   }
 }
@@ -127,7 +127,7 @@ browser.action.onClicked.addListener(async (tab) => {
 browser.runtime.onMessage.addListener(async (msg, sender) => {
   if (!sender.tab) return;
 
-  // From app-content.js, running on the RadioTube app tab: which room
+  // From app-content.js, running on the Radio2Gether app tab: which room
   // (if any) the DJ currently has open there, and their proof of
   // ownership for it.
   if (msg?.type === "DJ_ROOM") {
