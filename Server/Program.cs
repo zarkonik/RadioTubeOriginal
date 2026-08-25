@@ -5,6 +5,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRoomStateStore, InMemoryRoomStateStore>();
+builder.Services.AddSingleton<IChatStore, InMemoryChatStore>();
+builder.Services.AddSingleton<IRoomRegistry, InMemoryRoomRegistry>();
+builder.Services.AddSingleton<IRoomPresenceStore, InMemoryRoomPresenceStore>();
 builder.Services.AddScoped<RoomService>();
 
 // Dev-only: SignalR's negotiate request sends credentials, which is
@@ -35,11 +38,21 @@ app.UseCors(DevCorsPolicy);
 app.MapHub<RoomHub>("/hubs/room");
 
 // Called by the browser extension, which isn't a SignalR client — it
-// just fires a one-off "load this video" request.
-app.MapPost("/api/room/load-video", async (LoadVideoRequest req, RoomService room) =>
+// just fires a one-off "load this video" request into whichever room
+// the DJ armed the extension for. X-Dj-Token proves the caller actually
+// is that room's DJ (the extension picks it up automatically from the
+// app page — see extension/app-content.js).
+app.MapPost("/api/rooms/{roomId}/load-video", async (string roomId, LoadVideoRequest req, HttpRequest http, RoomService room, IRoomRegistry registry) =>
 {
     if (string.IsNullOrWhiteSpace(req.VideoId)) return Results.BadRequest();
-    await room.LoadVideo(req.VideoId);
+
+    var target = registry.Get(roomId);
+    if (target is null) return Results.NotFound();
+
+    var token = http.Headers["X-Dj-Token"].ToString();
+    if (token != target.DjToken) return Results.Unauthorized();
+
+    await room.LoadVideo(roomId, req.VideoId);
     return Results.Ok();
 });
 

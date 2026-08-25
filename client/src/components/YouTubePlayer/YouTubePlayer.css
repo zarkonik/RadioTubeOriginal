@@ -1,3 +1,18 @@
+.yt-aspect {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.yt-aspect iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .yt-locked iframe {
   pointer-events: none;
 }
@@ -6,8 +21,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 360px;
-  border: 1px dashed #444;
-  border-radius: 8px;
-  color: #888;
+  border: 1px dashed var(--border);
+  color: var(--text);
+  background: var(--bg);
 }

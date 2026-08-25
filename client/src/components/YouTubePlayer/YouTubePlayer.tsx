@@ -30,19 +30,19 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, Props>(
 
     if (!videoId) {
       return (
-        <div className="yt-placeholder">
+        <div className="yt-aspect yt-placeholder">
           <p>No track loaded.</p>
         </div>
       );
     }
 
     return (
-      <div className={locked ? "yt-locked" : undefined}>
+      <div className={`yt-aspect${locked ? " yt-locked" : ""}`}>
         <YouTube
           videoId={videoId}
           opts={{
             width: "100%",
-            height: "360",
+            height: "100%",
             playerVars: {
               controls: controls ? 1 : 0,
               disablekb: controls ? 0 : 1,

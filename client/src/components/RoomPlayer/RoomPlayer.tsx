@@ -79,6 +79,27 @@ export default function RoomPlayer({ role }: Props) {
     return () => clearInterval(id);
   }, [isDj, joined, room.isPlaying, room.videoId, room.positionAtBroadcast, room.serverTime]);
 
+  // DJ-only: since a hidden tab's spontaneous pause is now ignored
+  // (above) instead of broadcast, the room keeps playing for everyone
+  // while the DJ's own copy sits frozen. Catch it back up the moment the
+  // tab is visible again, the same way a listener resyncs.
+  useEffect(() => {
+    if (!isDj) return;
+
+    function handleVisibility() {
+      if (document.hidden) return;
+      const player = playerRef.current?.getPlayer();
+      if (!player || !room.isPlaying) return;
+
+      const target = getTargetPosition(room, Date.now());
+      player.seekTo(target, true);
+      player.playVideo();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [isDj, room]);
+
   function handleLoad() {
     const id = extractVideoId(urlInput);
     if (!id) {
@@ -94,8 +115,13 @@ export default function RoomPlayer({ role }: Props) {
   // in the YT controls) becomes a broadcast to all listeners. This is the
   // spot that later gets changed to call connection.invoke(...) instead
   // of the local store.
+  //
+  // Background tabs get silently paused by YouTube/the browser to save
+  // resources — without the document.hidden guard, that non-action gets
+  // mistaken for the DJ clicking pause and broadcast as a real Pause to
+  // the whole room.
   function handleStateChange(state: number, currentTime: number) {
-    if (!isDj) return;
+    if (!isDj || document.hidden) return;
     if (state === YT_PLAYING) play(currentTime);
     else if (state === YT_PAUSED) pause(currentTime);
   }

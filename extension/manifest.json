@@ -10,6 +10,11 @@
       "matches": ["*://www.youtube.com/*", "*://youtu.be/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["app-content.js"],
+      "run_at": "document_idle"
     }
   ],
   "action": {

@@ -1,0 +1,96 @@
+.room-picker {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow);
+}
+
+.room-picker h2 {
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.room-picker-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.room-picker input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.room-picker input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.room-picker button {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+
+.room-picker button:hover {
+  background: var(--accent-hover);
+}
+
+.room-picker-empty {
+  color: var(--text);
+  margin: 0;
+}
+
+.room-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.room-picker-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.room-picker-count {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: normal;
+}
+
+.room-picker .error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0;
+}
+
+@media (max-width: 480px) {
+  .room-picker-row {
+    flex-direction: column;
+  }
+}

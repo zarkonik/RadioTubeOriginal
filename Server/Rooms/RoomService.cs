@@ -4,21 +4,23 @@ namespace Server.Rooms;
 
 // Broadcast logic shared by RoomHub (calls from connected clients) and
 // the REST endpoint (calls from the browser extension, which isn't a
-// SignalR client).
+// SignalR client). Only handles per-room playback/chat state — group
+// membership (who's in which room) is the Hub's job, since that needs
+// the Hub's Context/Groups.
 public class RoomService
 {
-    private const string DefaultRoomId = "default";
-
     private readonly IRoomStateStore _store;
+    private readonly IChatStore _chat;
     private readonly IHubContext<RoomHub> _hub;
 
-    public RoomService(IRoomStateStore store, IHubContext<RoomHub> hub)
+    public RoomService(IRoomStateStore store, IChatStore chat, IHubContext<RoomHub> hub)
     {
         _store = store;
+        _chat = chat;
         _hub = hub;
     }
 
-    public Task LoadVideo(string videoId)
+    public Task LoadVideo(string roomId, string videoId)
     {
         var state = new RoomState
         {
@@ -27,46 +29,55 @@ public class RoomService
             PositionAtBroadcast = 0,
             ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
-        return Broadcast(state);
+        return Broadcast(roomId, state);
     }
 
-    public Task Play(double fromPosition)
+    public Task Play(string roomId, double fromPosition)
     {
-        var state = _store.Get(DefaultRoomId) with
+        var state = _store.Get(roomId) with
         {
             IsPlaying = true,
             PositionAtBroadcast = fromPosition,
             ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
-        return Broadcast(state);
+        return Broadcast(roomId, state);
     }
 
-    public Task Pause(double atPosition)
+    public Task Pause(string roomId, double atPosition)
     {
-        var state = _store.Get(DefaultRoomId) with
+        var state = _store.Get(roomId) with
         {
             IsPlaying = false,
             PositionAtBroadcast = atPosition,
             ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
-        return Broadcast(state);
+        return Broadcast(roomId, state);
     }
 
-    public Task Seek(double toPosition)
+    public Task Seek(string roomId, double toPosition)
     {
-        var state = _store.Get(DefaultRoomId) with
+        var state = _store.Get(roomId) with
         {
             PositionAtBroadcast = toPosition,
             ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
-        return Broadcast(state);
+        return Broadcast(roomId, state);
     }
 
-    public RoomState GetState() => _store.Get(DefaultRoomId);
+    public RoomState GetState(string roomId) => _store.Get(roomId);
 
-    private async Task Broadcast(RoomState state)
+    public IReadOnlyList<ChatMessage> GetChatHistory(string roomId) => _chat.Get(roomId);
+
+    public async Task SendMessage(string roomId, string author, string text)
     {
-        _store.Set(DefaultRoomId, state);
-        await _hub.Clients.Group(DefaultRoomId).SendAsync("RoomState", state);
+        var message = new ChatMessage { Author = author, Text = text };
+        _chat.Add(roomId, message);
+        await _hub.Clients.Group(roomId).SendAsync("ChatMessage", message);
+    }
+
+    private async Task Broadcast(string roomId, RoomState state)
+    {
+        _store.Set(roomId, state);
+        await _hub.Clients.Group(roomId).SendAsync("RoomState", state);
     }
 }

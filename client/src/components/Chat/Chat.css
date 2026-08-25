@@ -1,4 +1,4 @@
-.room-player {
+.chat {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -7,21 +7,44 @@
   border-radius: var(--radius);
   background: var(--bg-raised);
   box-shadow: var(--shadow);
+  height: 480px;
 }
 
-.room-player h2 {
+.chat h2 {
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent);
 }
 
-.load-row {
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+}
+
+.chat-message {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.chat-author {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.chat-nickname-row,
+.chat-input-row {
   display: flex;
   gap: 0.5rem;
 }
 
-.load-row input {
+.chat input {
   flex: 1;
   min-width: 0;
   padding: 0.6rem 0.75rem;
@@ -31,34 +54,35 @@
   color: var(--text-h);
 }
 
-.load-row input:focus {
+.chat input:focus {
   outline: none;
   border-color: var(--accent-border);
 }
 
-.room-player button {
+.chat button {
   padding: 0.6rem 1.1rem;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
 }
 
-.room-player button:hover {
-  border-color: var(--accent);
-  color: var(--text-h);
-}
-
-.room-player .error {
-  color: var(--danger);
-  font-size: 0.875rem;
-  margin: 0;
+.chat button:hover {
+  background: var(--accent-hover);
 }
 
 @media (max-width: 480px) {
-  .load-row {
+  .chat {
+    height: 320px;
+    padding: 1rem;
+  }
+
+  .chat-nickname-row,
+  .chat-input-row {
     flex-direction: column;
   }
 }

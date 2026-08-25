@@ -6,6 +6,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+const BACKEND_BASE = "http://localhost:5181";
+
+function loadVideoUrl(roomId) {
+  return `${BACKEND_BASE}/api/rooms/${roomId}/load-video`;
+}
+
 // Kept in sync by hand with client/src/lib/youtube.ts extractVideoId —
 // this is a separate codebase (extension, not bundled with the app), so
 // no shared import.
@@ -26,43 +32,77 @@ function extractVideoId(url) {
   return null;
 }
 
-const BACKEND_URL = "http://localhost:5181/api/room/load-video";
-
 // Persisted (not just in-memory) because the MV3 service worker can be
-// killed and restarted between events — losing armedTabId mid-session
-// would silently stop tracking without any visible sign to the DJ.
-async function getArmedState() {
-  const { armedTabId, lastVideoId } = await browser.storage.local.get(["armedTabId", "lastVideoId"]);
-  return { armedTabId: armedTabId ?? null, lastVideoId: lastVideoId ?? null };
+// killed and restarted between events.
+//
+// armedTabId/lastVideoId track the YouTube tab the DJ picked as their
+// source. djRoomId/djToken are separate and global (not per-tab):
+// whatever room+token app-content.js last reported from the RadioTube
+// app tab — there's realistically one DJ app tab open at a time, so the
+// two content scripts (running in two different tabs) meet here instead
+// of trying to match tab ids against each other.
+async function getState() {
+  const { armedTabId, lastVideoId, djRoomId, djToken } = await browser.storage.local.get([
+    "armedTabId",
+    "lastVideoId",
+    "djRoomId",
+    "djToken",
+  ]);
+  return {
+    armedTabId: armedTabId ?? null,
+    lastVideoId: lastVideoId ?? null,
+    djRoomId: djRoomId ?? null,
+    djToken: djToken ?? null,
+  };
 }
 
 async function setArmedState(armedTabId, lastVideoId = null) {
-  await browser.storage.local.set({ armedTabId, lastVideoId });
+  const { djRoomId, djToken } = await getState();
+  await browser.storage.local.set({ armedTabId, lastVideoId, djRoomId, djToken });
 }
 
-async function postVideoId(videoId) {
-  const res = await fetch(BACKEND_URL, {
+async function setDjRoom(roomId, djToken) {
+  const { armedTabId, lastVideoId } = await getState();
+  await browser.storage.local.set({ armedTabId, lastVideoId, djRoomId: roomId, djToken });
+}
+
+async function postVideoId(roomId, djToken, videoId) {
+  const res = await fetch(loadVideoUrl(roomId), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Dj-Token": djToken ?? "" },
     body: JSON.stringify({ videoId }),
   });
   if (!res.ok) throw new Error(`Status ${res.status}`);
 }
 
-async function setArmedBadge(tabId) {
+// Blue = armed and last send (if any) succeeded. Orange = armed but
+// something's wrong (no room known yet, or the last send failed) —
+// visible instead of failing silently.
+async function setArmedBadge(tabId, ok) {
   await browser.action.setBadgeText({ text: "DJ", tabId });
-  await browser.action.setBadgeBackgroundColor({ color: "#4a7dff", tabId });
+  await browser.action.setBadgeBackgroundColor({ color: ok ? "#4a7dff" : "#e0a555", tabId });
 }
 
 async function clearBadge(tabId) {
   await browser.action.setBadgeText({ text: "", tabId });
 }
 
+async function sendVideo(tabId, roomId, djToken, videoId) {
+  try {
+    await postVideoId(roomId, djToken, videoId);
+    await setArmedBadge(tabId, true);
+  } catch (err) {
+    console.error("RadioTube: failed to send video to room", err);
+    await setArmedBadge(tabId, false);
+  }
+}
+
 // Click toggles auto-tracking for that tab: first click arms it (and
-// sends whatever video is currently open), second click on the same tab
-// disarms it. Only one tab can be armed at a time.
+// sends whatever video is currently open, if a room is already known),
+// second click on the same tab disarms it. Only one tab can be armed at
+// a time.
 browser.action.onClicked.addListener(async (tab) => {
-  const { armedTabId } = await getArmedState();
+  const { armedTabId, djRoomId, djToken } = await getState();
 
   if (armedTabId === tab.id) {
     await setArmedState(null);
@@ -74,37 +114,47 @@ browser.action.onClicked.addListener(async (tab) => {
 
   const videoId = extractVideoId(tab.url);
   await setArmedState(tab.id, videoId);
-  await setArmedBadge(tab.id);
 
-  if (videoId) {
-    try {
-      await postVideoId(videoId);
-    } catch {
-      // Backend unreachable — stay armed, the next real video change
-      // (or a manual re-click) will retry.
-    }
+  if (!djRoomId) {
+    await setArmedBadge(tab.id, false);
+    return;
   }
+
+  await setArmedBadge(tab.id, true);
+  if (videoId) await sendVideo(tab.id, djRoomId, djToken, videoId);
 });
 
-// Content script reports every video change in the armed tab (manual
-// click on YouTube, or autoplay to the next track).
 browser.runtime.onMessage.addListener(async (msg, sender) => {
-  if (msg?.type !== "VIDEO_CHANGED" || !sender.tab) return;
+  if (!sender.tab) return;
 
-  const { armedTabId, lastVideoId } = await getArmedState();
+  // From app-content.js, running on the RadioTube app tab: which room
+  // (if any) the DJ currently has open there, and their proof of
+  // ownership for it.
+  if (msg?.type === "DJ_ROOM") {
+    await setDjRoom(msg.roomId, msg.djToken);
+    const { armedTabId } = await getState();
+    if (armedTabId !== null) await setArmedBadge(armedTabId, Boolean(msg.roomId));
+    return;
+  }
+
+  // From content.js, running on a YouTube tab: the video there changed.
+  if (msg?.type !== "VIDEO_CHANGED") return;
+
+  const { armedTabId, lastVideoId, djRoomId, djToken } = await getState();
   if (sender.tab.id !== armedTabId) return; // not the DJ's tracked tab
-  if (msg.videoId === lastVideoId) return; // duplicate navigate-finish, ignore
+  if (msg.videoId === lastVideoId) return; // duplicate, ignore
+
+  if (!djRoomId) {
+    await setArmedBadge(armedTabId, false); // armed, but no room known yet
+    return;
+  }
 
   await setArmedState(armedTabId, msg.videoId);
-  try {
-    await postVideoId(msg.videoId);
-  } catch {
-    // Leave it armed — a later track change will retry the POST.
-  }
+  await sendVideo(armedTabId, djRoomId, djToken, msg.videoId);
 });
 
 // Don't leave a stale armed badge pointing at a tab that's gone.
 browser.tabs.onRemoved.addListener(async (tabId) => {
-  const { armedTabId } = await getArmedState();
+  const { armedTabId } = await getState();
   if (tabId === armedTabId) await setArmedState(null);
 });
