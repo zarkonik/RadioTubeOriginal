@@ -2,13 +2,16 @@ import { create } from "zustand";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import type { ChatMessage, RoomState, RoomSummary } from "../types/room";
 
-// Same host the page was loaded from (works for both localhost and a
-// phone hitting the laptop's LAN IP). Matches the page's protocol —
-// an https page can't open a plain ws:// connection to an http backend
-// (mixed content), so the backend exposes both ports and this picks
-// whichever one lines up.
+// In production, Caddy proxies /hubs/* on the same domain as the site
+// itself, so a plain relative path just works — no separate port, no
+// mixed-content issue. Dev mode keeps hitting the local backend
+// directly, since Vite's dev server and the backend run on different
+// ports (and the backend exposes both http/https to match whichever the
+// frontend loaded as — see Server/Properties/launchSettings.json).
 const isHttps = window.location.protocol === "https:";
-const hubUrl = `${isHttps ? "https" : "http"}://${window.location.hostname}:${isHttps ? 7181 : 5181}/hubs/room`;
+const hubUrl = import.meta.env.DEV
+  ? `${isHttps ? "https" : "http"}://${window.location.hostname}:${isHttps ? 7181 : 5181}/hubs/room`
+  : `${window.location.origin}/hubs/room`;
 
 const connection = new HubConnectionBuilder()
   .withUrl(hubUrl)
