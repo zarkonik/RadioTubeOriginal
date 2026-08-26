@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Radio2Gether — Next Video
 // @namespace    https://radio2gether.com
-// @version      1.0
+// @version      1.1
 // @description  Sends the YouTube video you're watching to your Radio2Gether DJ room automatically.
 // @match        https://www.youtube.com/*
 // @match        https://youtu.be/*
@@ -65,8 +65,13 @@
     // "arm" step here (no extension background script to track tab ids
     // against), so with multiple YouTube tabs open the last one to
     // change wins.
-    let lastVideoId;
-
+    //
+    // The "already sent" check uses GM storage (not a plain JS
+    // variable) because it must survive this script being re-injected —
+    // Chrome can discard and reload a backgrounded YouTube tab (e.g. to
+    // free memory when another tab opens), and a plain in-memory
+    // variable would forget it already sent the current video, causing
+    // a duplicate "load" that resets playback to 0 for the whole room.
     async function sendVideo(roomId, djToken, videoId) {
       try {
         const res = await fetch(`https://radio2gether.com/api/rooms/${roomId}/load-video`, {
@@ -82,8 +87,8 @@
 
     function notify() {
       const videoId = extractVideoId(location.href);
-      if (!videoId || videoId === lastVideoId) return;
-      lastVideoId = videoId;
+      if (!videoId || videoId === GM_getValue("lastSentVideoId", null)) return;
+      GM_setValue("lastSentVideoId", videoId);
 
       const roomId = GM_getValue("djRoomId", null);
       if (!roomId) return;

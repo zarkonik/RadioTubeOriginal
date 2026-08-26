@@ -22,12 +22,6 @@ public class RoomService
 
     public Task LoadVideo(string roomId, string videoId)
     {
-        // A duplicate "load" for the video already playing (e.g. a
-        // background YouTube tab reloading and re-reporting its current
-        // video) would otherwise reset playback to 0 for everyone —
-        // treat it as a no-op instead of a genuine track change.
-        if (_store.Get(roomId).VideoId == videoId) return Task.CompletedTask;
-
         var state = new RoomState
         {
             VideoId = videoId,
