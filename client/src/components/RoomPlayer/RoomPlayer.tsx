@@ -95,9 +95,15 @@ export default function RoomPlayer({ role }: Props) {
     function handleVisibility() {
       if (document.hidden) return;
       const player = playerRef.current?.getPlayer();
-      if (!player || !room.isPlaying) return;
+      // Read the freshest room state directly from the store instead of
+      // the value captured when this effect last ran — visibilitychange
+      // can fire before a just-arrived RoomState update (e.g. a fresh
+      // LoadVideo) has flowed through React, and resyncing against that
+      // stale snapshot seeks to the previous track's leftover position.
+      const currentRoom = useRoomStore.getState().room;
+      if (!player || !currentRoom.isPlaying) return;
 
-      const target = getTargetPosition(room, Date.now());
+      const target = getTargetPosition(currentRoom, Date.now());
       suppressStateChange.current = true;
       player.seekTo(target, true);
       player.playVideo();
@@ -108,7 +114,7 @@ export default function RoomPlayer({ role }: Props) {
 
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [isDj, room]);
+  }, [isDj]);
 
   function handleLoad() {
     const id = extractVideoId(urlInput);
