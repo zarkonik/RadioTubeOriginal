@@ -94,7 +94,7 @@ export default function RoomPlayer({ role }: Props) {
       if (document.hidden) return;
       const player = playerRef.current?.getPlayer();
       if (!player) return;
-      player.getPlayerState().then((state) => {
+      player.getPlayerState().then((state: number) => {
         if (state === YT_PAUSED) player.playVideo();
       });
     }
