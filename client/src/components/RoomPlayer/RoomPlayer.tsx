@@ -33,6 +33,12 @@ export default function RoomPlayer({ role }: Props) {
   const [urlInput, setUrlInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Set while a resync-triggered seekTo/playVideo call is in flight, so the
+  // PLAYING event it causes doesn't get mistaken for a real DJ action and
+  // re-broadcast with a stale currentTime (YouTube can report the
+  // pre-seek position for a brief window right after seekTo).
+  const suppressStateChange = useRef(false);
+
   // Browsers block autoplay-with-sound until the user interacts with the
   // page. The DJ's "Load" click already is that gesture; a listener needs
   // an explicit "Join" click before the player mounts.
@@ -92,8 +98,12 @@ export default function RoomPlayer({ role }: Props) {
       if (!player || !room.isPlaying) return;
 
       const target = getTargetPosition(room, Date.now());
+      suppressStateChange.current = true;
       player.seekTo(target, true);
       player.playVideo();
+      setTimeout(() => {
+        suppressStateChange.current = false;
+      }, 1000);
     }
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -121,7 +131,7 @@ export default function RoomPlayer({ role }: Props) {
   // mistaken for the DJ clicking pause and broadcast as a real Pause to
   // the whole room.
   function handleStateChange(state: number, currentTime: number) {
-    if (!isDj || document.hidden) return;
+    if (!isDj || document.hidden || suppressStateChange.current) return;
     if (state === YT_PLAYING) play(currentTime);
     else if (state === YT_PAUSED) pause(currentTime);
   }
