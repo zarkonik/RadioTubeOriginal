@@ -8,6 +8,9 @@ Server/obj/
 node_modules/
 dist/
 
+# Extension build artifacts
+extension/*.zip
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
