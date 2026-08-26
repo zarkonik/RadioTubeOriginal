@@ -33,12 +33,6 @@ export default function RoomPlayer({ role }: Props) {
   const [urlInput, setUrlInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Set while a resync-triggered seekTo/playVideo call is in flight, so the
-  // PLAYING event it causes doesn't get mistaken for a real DJ action and
-  // re-broadcast with a stale currentTime (YouTube can report the
-  // pre-seek position for a brief window right after seekTo).
-  const suppressStateChange = useRef(false);
-
   // Browsers block autoplay-with-sound until the user interacts with the
   // page. The DJ's "Load" click already is that gesture; a listener needs
   // an explicit "Join" click before the player mounts.
@@ -85,31 +79,24 @@ export default function RoomPlayer({ role }: Props) {
     return () => clearInterval(id);
   }, [isDj, joined, room.isPlaying, room.videoId, room.positionAtBroadcast, room.serverTime]);
 
-  // DJ-only: since a hidden tab's spontaneous pause is now ignored
-  // (above) instead of broadcast, the room keeps playing for everyone
-  // while the DJ's own copy sits frozen. Catch it back up the moment the
-  // tab is visible again, the same way a listener resyncs.
+  // DJ-only: a hidden tab's spontaneous pause is ignored (above) instead
+  // of broadcast, so if the browser actually froze the DJ's own copy in
+  // the background, just resume it where it is when the tab becomes
+  // visible again. No forced seek — the DJ is the source of truth for
+  // the room, so jumping their player forward to "catch up" to the
+  // room's extrapolated position only produces a confusing, unrequested
+  // skip on their end. If they're genuinely behind, their next natural
+  // play/seek broadcasts the real position and everyone else corrects to it.
   useEffect(() => {
     if (!isDj) return;
 
     function handleVisibility() {
       if (document.hidden) return;
       const player = playerRef.current?.getPlayer();
-      // Read the freshest room state directly from the store instead of
-      // the value captured when this effect last ran — visibilitychange
-      // can fire before a just-arrived RoomState update (e.g. a fresh
-      // LoadVideo) has flowed through React, and resyncing against that
-      // stale snapshot seeks to the previous track's leftover position.
-      const currentRoom = useRoomStore.getState().room;
-      if (!player || !currentRoom.isPlaying) return;
-
-      const target = getTargetPosition(currentRoom, Date.now());
-      suppressStateChange.current = true;
-      player.seekTo(target, true);
-      player.playVideo();
-      setTimeout(() => {
-        suppressStateChange.current = false;
-      }, 1000);
+      if (!player) return;
+      player.getPlayerState().then((state) => {
+        if (state === YT_PAUSED) player.playVideo();
+      });
     }
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -137,7 +124,7 @@ export default function RoomPlayer({ role }: Props) {
   // mistaken for the DJ clicking pause and broadcast as a real Pause to
   // the whole room.
   function handleStateChange(state: number, currentTime: number) {
-    if (!isDj || document.hidden || suppressStateChange.current) return;
+    if (!isDj || document.hidden) return;
     if (state === YT_PLAYING) play(currentTime);
     else if (state === YT_PAUSED) pause(currentTime);
   }
