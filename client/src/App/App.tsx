@@ -6,6 +6,10 @@ import { useRoomStore } from "../store/roomStore";
 import type { Role } from "../types/room";
 import "./App.css";
 
+// Public YouTube video explaining the site, shown above the role picker.
+// Replace with the real video's id once it's uploaded.
+const EXPLAINER_VIDEO_ID = "CJAVnFITGTg";
+
 // Each device picks its own role, then either creates a room (DJ) or
 // picks one from the live list (listener) before entering the player.
 function App() {
@@ -29,13 +33,25 @@ function App() {
         )}
 
         {role === null ? (
-          <div className="role-picker">
-            <button className="btn-primary" onClick={() => setRole("dj")}>
-              I'm the DJ
-            </button>
-            <button className="btn-primary" onClick={() => setRole("listener")}>
-              I'm a listener
-            </button>
+          <div className="landing">
+            {EXPLAINER_VIDEO_ID && (
+              <div className="explainer yt-aspect">
+                <iframe
+                  src={`https://www.youtube.com/embed/${EXPLAINER_VIDEO_ID}`}
+                  title="How Radio2Gether works"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
+            <div className="role-picker">
+              <button className="btn-primary" onClick={() => setRole("dj")}>
+                I'm the DJ
+              </button>
+              <button className="btn-primary" onClick={() => setRole("listener")}>
+                I'm a listener
+              </button>
+            </div>
           </div>
         ) : currentRoom === null ? (
           <RoomPicker role={role} />
